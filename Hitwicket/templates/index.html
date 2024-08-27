@@ -1,0 +1,237 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Grid War</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background-color: #484646;
+        color: #fff;
+        margin: 0;
+        padding: 0;
+        height: 100vh;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .header {
+        text-align: center;
+        margin-bottom: 20px;
+      }
+      .header h1 {
+        font-size: 36px;
+        color: #fff;
+      }
+      .container {
+        display: flex;
+        width: 100%;
+        height: 80%;
+        max-width: 1200px;
+      }
+      .history {
+        background-color: #333;
+        border: 1px solid #444;
+        border-radius: 8px;
+        padding: 20px;
+        width: 300px;
+        max-height: 100%;
+        overflow-y: auto;
+        box-shadow: 0 0 10px rgba(0, 0, 0, 0.3);
+        margin-right: 20px;
+      }
+      .history h2 {
+        margin: 0 0 10px 0;
+        font-size: 20px;
+        color: #f0f0f0;
+      }
+      .history-item {
+        margin-bottom: 10px;
+        font-size: 16px;
+        color: #f0f0f0;
+      }
+      .grid-container {
+        flex: 1;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+      }
+      .status {
+        margin-bottom: 20px;
+        font-size: 24px;
+        text-align: center;
+        color: #fff;
+      }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(5, 80px);
+        grid-gap: 5px;
+      }
+      .cell {
+        width: 80px;
+        height: 80px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background-color: #222;
+        border: 1px solid #444;
+        color: #fff;
+        font-size: 18px;
+        cursor: pointer;
+      }
+      .controls {
+        text-align: center;
+        margin-top: 20px;
+      }
+      input[type="text"] {
+        padding: 10px;
+        margin: 5px;
+        border: 1px solid #666;
+        border-radius: 4px;
+        background-color: #222;
+        color: #fff;
+        width: 150px;
+      }
+      button {
+        padding: 10px 20px;
+        background-color: #555;
+        border: none;
+        border-radius: 4px;
+        color: #fff;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      button:hover {
+        background-color: #777;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="header">
+      <h1>Grid War</h1>
+    </div>
+    <div class="container">
+      <div class="history" id="history">
+        <h2>Move History</h2>
+        <!-- Move history will be populated here -->
+      </div>
+      <div class="grid-container">
+        <div class="status" id="status">Current Player: A</div>
+        <div class="grid" id="grid">
+          <!-- Cells will be populated here -->
+        </div>
+        <div class="controls">
+          <input
+            type="text"
+            id="character"
+            placeholder="Enter character (e.g., P1)"
+          />
+          <input
+            type="text"
+            id="direction"
+            placeholder="Enter move (e.g., L, R, F, B)"
+          />
+          <button onclick="makeMove()">Move</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      const gridElement = document.getElementById("grid");
+      const historyElement = document.getElementById("history");
+
+      function renderBoard(board) {
+        gridElement.innerHTML = "";
+        for (let row = 0; row < 5; row++) {
+          for (let col = 0; col < 5; col++) {
+            const cell = document.createElement("div");
+            cell.classList.add("cell");
+            cell.innerText = board[row][col] || "";
+            gridElement.appendChild(cell);
+          }
+        }
+      }
+
+      function renderHistory(moveHistory) {
+        historyElement.innerHTML = "<h2>Move History</h2>";
+        moveHistory.forEach((move) => {
+          const moveItem = document.createElement("div");
+          moveItem.classList.add("history-item");
+          moveItem.innerText = `${move.player} moved ${move.character} ${move.direction} from ${move.from} to ${move.to}`;
+          historyElement.appendChild(moveItem);
+        });
+      }
+
+      function checkWinCondition(board) {
+        let playerACharacters = 0;
+        let playerBCharacters = 0;
+
+        // Count remaining characters for each player
+        board.forEach(row => {
+          row.forEach(cell => {
+            if (cell && cell.startsWith('A-')) playerACharacters++;
+            if (cell && cell.startsWith('B-')) playerBCharacters++;
+          });
+        });
+
+        // Determine winner
+        if (playerACharacters === 0) {
+          return 'B';
+        } else if (playerBCharacters === 0) {
+          return 'A';
+        }
+        return null;
+      }
+
+      function makeMove() {
+        const character = document.getElementById("character").value;
+        const direction = document.getElementById("direction").value;
+
+        fetch("/move", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ character, direction }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            document.getElementById("status").innerText =
+              "Current Player: " + data.game_state.current_player;
+            renderBoard(data.game_state.board);
+            renderHistory(data.move_history);
+
+            // Check for win condition
+            const winner = checkWinCondition(data.game_state.board);
+            if (winner) {
+              displayWinnerMessage(winner);
+            }
+          })
+          .catch((error) => console.error("Error:", error));
+      }
+
+      function displayWinnerMessage(winner) {
+        const statusElement = document.getElementById("status");
+        statusElement.innerHTML = `<span style="color: green; font-size: 24px;">Player ${winner} wins! &#10004;</span>`;
+      }
+
+      // Initialize board and history on page load
+      document.addEventListener("DOMContentLoaded", function () {
+        fetch("/move", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ character: "P1", direction: "L" }),
+        })
+          .then((response) => response.json())
+          .then((data) => {
+            renderBoard(data.game_state.board);
+            document.getElementById("status").innerText =
+              "Current Player: " + data.game_state.current_player;
+            renderHistory(data.move_history);
+          });
+      });
+    </script>
+  </body>
+</html>
